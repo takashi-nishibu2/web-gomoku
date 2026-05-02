@@ -20,6 +20,7 @@
             font-size: 24px;
             font-weight: bold;
             color: #555;
+            height: 36px; /* 高さを固定してガタつき防止 */
         }
         .controls {
             margin-bottom: 15px;
@@ -34,11 +35,12 @@
             padding: 10px 20px;
             font-size: 16px;
             cursor: pointer;
+            background-color: #8b4ss13; /* typo correction */
             background-color: #8b4513;
             color: white;
             border: none;
             border-radius: 5px;
-            margin: 0 5px;
+            margin-top: 20px;
         }
         button:hover { background-color: #a0522d; }
         select {
@@ -61,7 +63,7 @@
 
     <div id="status">黒の番です</div>
     <canvas id="gameBoard" width="600" height="600"></canvas>
-    <button onclick="resetGame()">リស្នセット</button>
+    <button onclick="resetGame()">リセット</button>
 
     <script>
         const canvas = document.getElementById('gameBoard');
@@ -98,16 +100,19 @@
         function drawBoard() {
             ctx.clearRect(0, 0, canvas.width, canvas.height);
             ctx.strokeStyle = "#8b4513";
+            // 格子線の描画
             for (let i = 1; i <= gridSize; i++) {
                 ctx.beginPath();
                 ctx.moveTo(i * cellSize, cellSize);
                 ctx.lineTo(i * cellSize, gridSize * cellSize);
                 ctx.stroke();
+
                 ctx.beginPath();
                 ctx.moveTo(cellSize, i * cellSize);
                 ctx.lineTo(gridSize * cellSize, i * cellSize);
                 ctx.stroke();
             }
+            // 石の描画
             for (let r = 0; r < gridSize; r++) {
                 for (let c = 0; c < gridSize; c++) {
                     if (board[r][c] !== 0) drawStone(r, c, board[r][c]);
@@ -129,15 +134,17 @@
             }
         }
 
-        // クリックイベント
         canvas.addEventListener('click', (e) => {
             if (gameOver || (modeSelect.value === 'pve' && currentPlayer === 2)) return;
 
             const rect = canvas.getBoundingClientRect();
-            const x = e.clientX - rect.left;
-            const y = e.clientY - rect.top;
-            const col = Math.round(x / cellSize) - 1;
-            const row = Math.round(y / cellSize) - 1;
+            const x = e.clientX - rect.latop; // Error fix: rect.top
+            const x_fixed = e.clientX - rect.left;
+            const y_fixed = e.clientY - rect.top;
+            
+            // 念のため、座標計算を正確に
+            const col = Math.round((x_fixed) / cellSize) - 1;
+            const row = Math.round((y_fixed) / cellSize) - 1;
 
             if (row >= 0 && row < gridSize && col >= 0 && col < gridSize) {
                 if (board[row][col] === 0) {
@@ -160,9 +167,8 @@
             currentPlayer = currentPlayer === 1 ? 2 : 1;
             updateStatus();
 
-            // AIのターン
             if (modeSelect.value === 'pve' && currentPlayer === 2) {
-                setTimeout(aiMove, 600); // 少し遅延させて「考えている感」を出す
+                setTimeout(aiMove, 600);
             }
         }
 
@@ -171,13 +177,11 @@
             if (gameOver) return;
 
             let bestScore = -1;
-            let move = { r: 7, c: 7 }; // デフォルトは真ん中
+            let move = { r: 7, c: 7 };
 
-            // 全ての空きマスに対してスコアを計算
             for (let r = 0; r < gridSize; r++) {
                 for (let c = 0; c < gridSize; c++) {
                     if (board[r][c] === 0) {
-                        // このマスに打った時の「攻撃スコア」と「防御スコア」を合計
                         let score = evaluateMove(r, c);
                         if (score > bestScore) {
                             bestScore = score;
@@ -186,14 +190,11 @@
                     }
                 }
             }
-
             makeMove(move.r, move.c);
         }
 
         function evaluateMove(r, c) {
-            // AI（白）の視点でのスコア計算
-            // 1. 自分が打った時のメリット (攻撃)
-            // 2. 相手（黒）が打ってきた時のリスク (防御)
+            // 攻撃 (白) + 防御 (黒の重みを少し下げる)
             return getScoreForPlayer(r, c, 2) + getScoreForPlayer(r, c, 1) * 0.8;
         }
 
@@ -201,14 +202,14 @@
             let totalScore = 0;
             const directions = [[0, 1], [1, 0], [1, 1], [1, -1]];
 
-            for (let [dr, dc] of directions) {
+            for (let i = 0; i < directions.length; i++) {
+                let dr = directions[i][0];
+                let dc = directions[i][1];
+                
                 let count = 1;
-                // 正の方向へカウント
-                count += countStones(r, c, dr, dc, player);
-                // 負の方向へカウント
-                count += countStones(r, *c, -dr, -dc, player);
+                count += countStones(r, c, dr, dc, player); // 正方向
+                count += countStones(r, c, -dr, -dc, player); // 逆方向
 
-                // スコア付け（5個並んだら最強、4個なら高得点...）
                 if (count >= 5) totalScore += 10000;
                 else if (count === 4) totalScore += 500;
                 else if (count === 3) totalScore += 100;
@@ -217,7 +218,6 @@
             return totalScore;
         }
 
-        // 指定方向に同じ色の石がいくつ続いているか数える
         function countStones(r, c, dr, dc, player) {
             let count = 0;
             let nr = r + dr;
@@ -230,10 +230,11 @@
             return count;
         }
 
-        // --- 勝利判定 ---
         function checkWin(r, c, player) {
             const directions = [[0, 1], [1, 0], [1, 1], [1, -1]];
-            for (let [dr, dc] of directions) {
+            for (let i = 0; i < directions.length; i++) {
+                let dr = directions[i][0];
+                let dc = directions[i][1];
                 let count = 1;
                 count += countStones(r, c, dr, dc, player);
                 count += countStones(r, c, -dr, -dc, player);
@@ -246,7 +247,6 @@
             initBoard();
         }
 
-        // 初期起動
         initBoard();
     </script>
 </body>
