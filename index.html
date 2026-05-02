@@ -1,0 +1,185 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <title>五目並べゲーム</title>
+    <style>
+        body {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            height: 100vh;
+            margin: 0;
+            background-color: #f0f0f0;
+            font-family: 'Arial', sans-serif;
+        }
+        h1 { color: #333; }
+        #status {
+            margin-bottom: 20px;
+            font-size: 24px;
+            font-weight: bold;
+            color: #555;
+        }
+        canvas {
+            background-color: #deb887; /* 木目風の色 */
+            border: 2px solid #8b4513;
+            box-shadow: 0 0 20px rgba(0,0,0,0.3);
+            cursor: pointer;
+        }
+        button {
+            margin-top: 20px;
+            padding: 10px 20px;
+            font-size: 18px;
+            cursor: pointer;
+            background-color: #8b4513;
+            color: white;
+            border: none;
+            border-radius: 5px;
+        }
+        button:hover { background-color: #a0522d; }
+    </style>
+</head>
+<body>
+
+    <h1>五目並べ</h1>
+    <div id="status">黒の番です</div>
+    <canvas id="gameBoard" width="600" height="600"></canvas>
+    <button onclick="resetGame()">リセット</button>
+
+    <script>
+        const canvas = document.getElementById('gameBoard');
+        const ctx = canvas.getContext('2d');
+        const statusDisplay = document.getElementById('status');
+        
+        const gridSize = 15; // 15x15のマス目
+        const cellSize = canvas.width / (gridSize + 1);
+        let board = [];
+        let currentPlayer = 1; // 1: 黒, 2: 白
+        let gameOver = false;
+
+        // ゲームの初期化
+        function initBoard() {
+            board = Array(gridSize).fill().map(() => Array(gridSize).fill(0));
+            currentPlayer = 1;
+            gameOver = false;
+            statusDisplay.textContent = "黒の番です";
+            statusDisplay.style.color = "#000";
+            drawBoard();
+        }
+
+        // 盤面を描画
+        function drawBoard() {
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+            
+            // 格子を描く
+            ctx.strokeStyle = "#8b451cand";
+            for (let i = 1; i <= gridSize; i++) {
+                // 縦線
+                ctx.beginPath();
+                ctx.moveTo(i * cellSize, cellSize);
+                ctx.lineTo(i * cellSize, gridSize * cellSize);
+                ctx.stroke();
+
+                // 横線
+                ctx.beginPath();
+                ctx.moveTo(cellSize, i * cellSize);
+                ctx.lineTo(gridSize * cellSize, i * cellSize);
+                ctx.stroke();
+            }
+
+            // 石を描く
+            for (let r = 0; r < gridSize; r++) {
+                for (let c = 0; c < gridSize; c++) {
+                    if (board[r][c] !== 0) {
+                        drawStone(r, c, board[r][c]);
+                    }
+                }
+            }
+        }
+
+        // 石を描画する関数
+        function drawStone(r, c, player) {
+            const x = (c + 1) * cellSize;
+            const y = (r + 1) * cellSize;
+            ctx.beginPath();
+            ctx.arc(x, y, cellSize * 0.4, 0, Math.PI * 2);
+            ctx.fillStyle = player === 1 ? "#000" : "#fff";
+            ctx.fill();
+            // 白い石には縁取りをつける
+            if (player === 2) {
+                ctx.strokeStyle = "#ccc";
+                ctx.lineWidth = 1;
+                ctx．stroke();
+            }
+        }
+
+        // クリック判定
+        canvas.addEventListener('click', (e) => {
+            if (gameOver) return;
+
+            const rect = canvas.getBoundingClientRect();
+            const x = e.clientX - rect.left;
+            const y = e.clientY - rect.top;
+
+            // クリックされた位置からマス目を計算
+            const col = Math.round(x / cellSize) - 1;
+            const row = Math.round(y / cellSize) - 1;
+
+            if (row >= 0 && row < gridSize && col >= 0 && col < gridSize) {
+                if (board[row][col] === 0) {
+                    makeMove(row, col);
+                }
+            }
+        });
+
+        // 手を打つ
+        function makeMove(r, c) {
+            board[r][c] = currentPlayer;
+            drawBoard();
+
+            if (checkWin(r, c)) {
+                statusDisplay.textContent = `${currentPlayer === 1 ? '黒' : '白'}の勝利！`;
+                statusDisplay.style.color = "red";
+                gameOver = true;
+            } else {
+                currentPlayer = currentPlayer === 1 ? 2 : 1;
+                statusDisplay.textContent = `${currentPlayer === 1 ? '黒' : '白'}の番です`;
+            }
+        }
+
+        // 勝利判定ロジック
+        function checkWin(r, c) {
+            const directions = [
+                [[0, 1], [0, -1]], // 横
+                [[1, 0], [-1, 0]], // 縦
+                [[1, 1], [-1, -1]], // 斜め右下
+                [[1, -1], [-1, 1]]  // 斜め左下
+            ];
+
+            for (let dir of directions) {
+                let count = 1;
+                for (let [dr, dc] of dir) {
+                    let nr = r + dr;
+                    let nc = c + dc;
+                    while (nr >= 0 && nr < gridSize && nc >= 0 && nc < gridSize && board[nr][nc] === currentPlayer) {
+                        count++;
+                        nr += dr;
+                        nc += dc;
+                    }
+                }
+                if (count >= 5) return true;
+            }
+            return false;
+        }
+
+        // リセット
+        function resetGame() {
+            initBoard();
+        }
+
+        // 開始
+        initBoard();
+    </script>
+</body>
+</html>
