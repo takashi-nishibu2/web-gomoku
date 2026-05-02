@@ -2,7 +2,7 @@
 <html lang="ja">
 <head>
     <meta charset="UTF-8">
-    <title>五目並べゲーム</title>
+    <title>五目並べ AI対戦版</title>
     <style>
         body {
             display: flex;
@@ -14,91 +14,107 @@
             background-color: #f0f0f0;
             font-family: 'Arial', sans-serif;
         }
-        h1 { color: #333; }
+        h1 { color: #333; margin-top: 0; }
         #status {
-            margin-bottom: 20px;
+            margin-bottom: 10px;
             font-size: 24px;
             font-weight: bold;
             color: #555;
         }
+        .controls {
+            margin-bottom: 15px;
+        }
         canvas {
-            background-color: #deb887; /* 木目風の色 */
+            background-color: #deb887;
             border: 2px solid #8b4513;
             box-shadow: 0 0 20px rgba(0,0,0,0.3);
             cursor: pointer;
         }
         button {
-            margin-top: 20px;
             padding: 10px 20px;
-            font-size: 18px;
+            font-size: 16px;
             cursor: pointer;
             background-color: #8b4513;
             color: white;
             border: none;
             border-radius: 5px;
+            margin: 0 5px;
         }
         button:hover { background-color: #a0522d; }
+        select {
+            padding: 10px;
+            font-size: 16px;
+        }
     </style>
 </head>
 <body>
 
     <h1>五目並べ</h1>
+    
+    <div class="controls">
+        モード：
+        <select id="gameMode">
+            <option value="pve">vs コンピュータ</option>
+            <option value="pvp">対人 (2人プレイ)</option>
+        </select>
+    </div>
+
     <div id="status">黒の番です</div>
     <canvas id="gameBoard" width="600" height="600"></canvas>
-    <button onclick="resetGame()">リセット</button>
+    <button onclick="resetGame()">リស្នセット</button>
 
     <script>
         const canvas = document.getElementById('gameBoard');
         const ctx = canvas.getContext('2d');
         const statusDisplay = document.getElementById('status');
+        const modeSelect = document.getElementById('gameMode');
         
-        const gridSize = 15; // 15x15のマス目
+        const gridSize = 15;
         const cellSize = canvas.width / (gridSize + 1);
         let board = [];
         let currentPlayer = 1; // 1: 黒, 2: 白
         let gameOver = false;
 
-        // ゲームの初期化
         function initBoard() {
             board = Array(gridSize).fill().map(() => Array(gridSize).fill(0));
             currentPlayer = 1;
             gameOver = false;
-            statusDisplay.textContent = "黒の番です";
-            statusDisplay.style.color = "#000";
+            updateStatus();
             drawBoard();
         }
 
-        // 盤面を描画
+        function updateStatus() {
+            if (gameOver) return;
+            const mode = modeSelect.value;
+            if (mode === 'pve' && currentPlayer === 2) {
+                statusDisplay.textContent = "コンピュータが思考中...";
+                statusDisplay.style.color = "#888";
+            } else {
+                statusDisplay.textContent = `${currentPlayer === 1 ? '黒' : '白'}の番です`;
+                statusDisplay.style.color = currentPlayer === 1 ? "#000" : "#555";
+            }
+        }
+
         function drawBoard() {
             ctx.clearRect(0, 0, canvas.width, canvas.height);
-            
-            // 格子を描く
-            ctx.strokeStyle = "#8b451cand";
+            ctx.strokeStyle = "#8b4513";
             for (let i = 1; i <= gridSize; i++) {
-                // 縦線
                 ctx.beginPath();
                 ctx.moveTo(i * cellSize, cellSize);
                 ctx.lineTo(i * cellSize, gridSize * cellSize);
                 ctx.stroke();
-
-                // 横線
                 ctx.beginPath();
                 ctx.moveTo(cellSize, i * cellSize);
                 ctx.lineTo(gridSize * cellSize, i * cellSize);
                 ctx.stroke();
             }
-
-            // 石を描く
             for (let r = 0; r < gridSize; r++) {
                 for (let c = 0; c < gridSize; c++) {
-                    if (board[r][c] !== 0) {
-                        drawStone(r, c, board[r][c]);
-                    }
+                    if (board[r][c] !== 0) drawStone(r, c, board[r][c]);
                 }
             }
         }
 
-        // 石を描画する関数
         function drawStone(r, c, player) {
             const x = (c + 1) * cellSize;
             const y = (r + 1) * cellSize;
@@ -106,23 +122,20 @@
             ctx.arc(x, y, cellSize * 0.4, 0, Math.PI * 2);
             ctx.fillStyle = player === 1 ? "#000" : "#fff";
             ctx.fill();
-            // 白い石には縁取りをつける
             if (player === 2) {
                 ctx.strokeStyle = "#ccc";
                 ctx.lineWidth = 1;
-                ctx．stroke();
+                ctx.stroke();
             }
         }
 
-        // クリック判定
+        // クリックイベント
         canvas.addEventListener('click', (e) => {
-            if (gameOver) return;
+            if (gameOver || (modeSelect.value === 'pve' && currentPlayer === 2)) return;
 
             const rect = canvas.getBoundingClientRect();
             const x = e.clientX - rect.left;
             const y = e.clientY - rect.top;
-
-            // クリックされた位置からマス目を計算
             const col = Math.round(x / cellSize) - 1;
             const row = Math.round(y / cellSize) - 1;
 
@@ -133,52 +146,107 @@
             }
         });
 
-        // 手を打つ
         function makeMove(r, c) {
             board[r][c] = currentPlayer;
             drawBoard();
 
-            if (checkWin(r, c)) {
+            if (checkWin(r, c, currentPlayer)) {
                 statusDisplay.textContent = `${currentPlayer === 1 ? '黒' : '白'}の勝利！`;
                 statusDisplay.style.color = "red";
                 gameOver = true;
-            } else {
-                currentPlayer = currentPlayer === 1 ? 2 : 1;
-                statusDisplay.textContent = `${currentPlayer === 1 ? '黒' : '白'}の番です`;
+                return;
+            }
+
+            currentPlayer = currentPlayer === 1 ? 2 : 1;
+            updateStatus();
+
+            // AIのターン
+            if (modeSelect.value === 'pve' && currentPlayer === 2) {
+                setTimeout(aiMove, 600); // 少し遅延させて「考えている感」を出す
             }
         }
 
-        // 勝利判定ロジック
-        function checkWin(r, c) {
-            const directions = [
-                [[0, 1], [0, -1]], // 横
-                [[1, 0], [-1, 0]], // 縦
-                [[1, 1], [-1, -1]], // 斜め右下
-                [[1, -1], [-1, 1]]  // 斜め左下
-            ];
+        // --- AIロジック ---
+        function aiMove() {
+            if (gameOver) return;
 
-            for (let dir of directions) {
-                let count = 1;
-                for (let [dr, dc] of dir) {
-                    let nr = r + dr;
-                    let nc = c + dc;
-                    while (nr >= 0 && nr < gridSize && nc >= 0 && nc < gridSize && board[nr][nc] === currentPlayer) {
-                        count++;
-                        nr += dr;
-                        nc += dc;
+            let bestScore = -1;
+            let move = { r: 7, c: 7 }; // デフォルトは真ん中
+
+            // 全ての空きマスに対してスコアを計算
+            for (let r = 0; r < gridSize; r++) {
+                for (let c = 0; c < gridSize; c++) {
+                    if (board[r][c] === 0) {
+                        // このマスに打った時の「攻撃スコア」と「防御スコア」を合計
+                        let score = evaluateMove(r, c);
+                        if (score > bestScore) {
+                            bestScore = score;
+                            move = { r, c };
+                        }
                     }
                 }
+            }
+
+            makeMove(move.r, move.c);
+        }
+
+        function evaluateMove(r, c) {
+            // AI（白）の視点でのスコア計算
+            // 1. 自分が打った時のメリット (攻撃)
+            // 2. 相手（黒）が打ってきた時のリスク (防御)
+            return getScoreForPlayer(r, c, 2) + getScoreForPlayer(r, c, 1) * 0.8;
+        }
+
+        function getScoreForPlayer(r, c, player) {
+            let totalScore = 0;
+            const directions = [[0, 1], [1, 0], [1, 1], [1, -1]];
+
+            for (let [dr, dc] of directions) {
+                let count = 1;
+                // 正の方向へカウント
+                count += countStones(r, c, dr, dc, player);
+                // 負の方向へカウント
+                count += countStones(r, *c, -dr, -dc, player);
+
+                // スコア付け（5個並んだら最強、4個なら高得点...）
+                if (count >= 5) totalScore += 10000;
+                else if (count === 4) totalScore += 500;
+                else if (count === 3) totalScore += 100;
+                else if (count === 2) totalScore += 10;
+            }
+            return totalScore;
+        }
+
+        // 指定方向に同じ色の石がいくつ続いているか数える
+        function countStones(r, c, dr, dc, player) {
+            let count = 0;
+            let nr = r + dr;
+            let nc = c + dc;
+            while (nr >= 0 && nr < gridSize && nc >= 0 && nc < gridSize && board[nr][nc] === player) {
+                count++;
+                nr += dr;
+                nc += dc;
+            }
+            return count;
+        }
+
+        // --- 勝利判定 ---
+        function checkWin(r, c, player) {
+            const directions = [[0, 1], [1, 0], [1, 1], [1, -1]];
+            for (let [dr, dc] of directions) {
+                let count = 1;
+                count += countStones(r, c, dr, dc, player);
+                count += countStones(r, c, -dr, -dc, player);
                 if (count >= 5) return true;
             }
             return false;
         }
 
-        // リセット
         function resetGame() {
             initBoard();
         }
 
-        // 開始
+        // 初期起動
         initBoard();
     </script>
 </body>
